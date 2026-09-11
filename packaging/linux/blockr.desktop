@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Blockr
+Comment=Block distracting websites at the system level
+Exec=blockr
+Icon=blockr
+Terminal=false
+Categories=Utility;
+StartupWMClass=Blockr

@@ -1,6 +1,8 @@
 # Blockr
 
-Blockr is a Windows desktop utility for managing a local website blocklist through the system `hosts` file. Blocked domains are redirected to `127.0.0.1` and tagged with the `#BLOCKR` marker so they can be listed or removed later.
+Blockr is a cross-platform desktop utility for managing a local website blocklist through the system `hosts` file. Blocked domains are redirected to `127.0.0.1` and tagged with the `#BLOCKR` marker so they can be listed or removed later.
+
+Works on **Windows, macOS, and Linux**.
 
 ## Features
 
@@ -8,54 +10,66 @@ Blockr is a Windows desktop utility for managing a local website blocklist throu
 - Remove the selected domain from the Blockr entries
 - Restore the built-in default blocklist
 - Refresh the list from the current `hosts` file
-- Package as a windowed Windows executable with PyInstaller
+- Flushes the OS DNS cache after a change so it takes effect immediately
+- Requests elevated privileges natively per OS (UAC on Windows, an admin-password dialog on macOS, a PolicyKit prompt on Linux)
+- Packaged as `.exe` (Windows), `.dmg` (macOS), and `.deb`/`.rpm` (Linux) — see [PACKAGING.md](PACKAGING.md)
 
 ## Requirements
 
-- Windows
 - Python 3.10 or newer
 - PyQt6
-- Administrator privileges
+- Administrator / root privileges (the app requests these itself on launch)
 
-The application requests administrator privileges because it reads and updates:
+The application requests elevated privileges because it reads and updates the OS hosts file:
 
-```text
-C:\Windows\System32\drivers\etc\hosts
-```
+| OS      | Path                                      |
+|---------|--------------------------------------------|
+| Windows | `C:\Windows\System32\drivers\etc\hosts`    |
+| macOS / Linux | `/etc/hosts`                        |
+
+On Linux, the elevation prompt is handled by `pkexec` (PolicyKit), which ships with virtually every desktop distro already. On macOS it's a native AppleScript admin-password dialog — no separate install needed.
 
 ## Run From Source
 
-Create and activate a virtual environment, then install the dependency:
+**Windows**
 
 ```powershell
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install PyQt6
-```
-
-Start the application:
-
-```powershell
 python blockr.py
 ```
 
-Windows will display an elevation prompt when administrator access is needed.
+**macOS / Linux**
 
-## Build The Executable
-
-Install PyInstaller if it is not already available:
-
-```powershell
-python -m pip install pyinstaller
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install PyQt6
+python3 blockr.py
 ```
 
-Build using the included spec file:
+The app will prompt you for elevated privileges on launch, however your OS normally does that.
 
-```powershell
-pyinstaller blockr.spec
+## Build The Installers
+
+See [PACKAGING.md](PACKAGING.md) for full instructions on producing `blockr.exe`, `Blockr.dmg`, `blockr.deb`, and `blockr.rpm`. Quick version:
+
+```bash
+# Windows
+pyinstaller packaging/windows/blockr-win.spec        # -> dist/blockr.exe
+
+# macOS
+pyinstaller packaging/mac/blockr-mac.spec             # -> dist/Blockr.app
+./packaging/mac/build-dmg.sh 1.0.0                     # -> dist/Blockr-1.0.0.dmg
+
+# Linux
+pyinstaller packaging/linux/blockr-linux.spec          # -> dist/blockr
+./packaging/linux/build-deb.sh 1.0.0                    # -> dist/blockr_1.0.0_amd64.deb
+./packaging/linux/build-rpm.sh 1.0.0                    # -> dist/blockr-1.0.0-1.x86_64.rpm
 ```
 
-The resulting executable is written to `dist\blockr.exe`.
+Each of these has to be built on its own OS — PyInstaller doesn't cross-compile.
 
 ## Usage
 
@@ -69,6 +83,6 @@ Input may include `http://`, `https://`, `www.`, or a path; these are removed du
 
 ## Notes
 
-- Changes affect the whole computer and may require restarting a browser or flushing the DNS cache before they are visible.
+- Changes affect the whole computer and may require restarting a browser before they're visible; Blockr flushes the OS DNS cache automatically after each change to minimize this.
 - Only lines containing the `#BLOCKR` marker are managed by this application.
 - Back up the `hosts` file before making changes if it contains important custom entries.

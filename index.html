@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Blockr — hosts-file blocking for Windows</title>
+    <title>Blockr — hosts-file blocking for Windows, macOS & Linux</title>
     <meta property="og:url" content="https://blockr.joelkajubi.site/" />
 <meta property="og:image" content="https://blockr.joelkajubi.site/og-image.png" />
 <meta property="og:image:alt" content="Blockr" />
@@ -174,6 +174,21 @@
         border: 1px solid var(--border);
       }
       .btn.secondary:hover {
+        border-color: var(--muted);
+      }
+
+      .os-alt {
+        font-size: 13px;
+        color: var(--muted);
+        margin: -22px 0 32px;
+      }
+      .os-alt a {
+        color: var(--ink);
+        text-decoration: none;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+      }
+      .os-alt a:hover {
         border-color: var(--muted);
       }
 
@@ -538,6 +553,42 @@
       }
 
       /* Install */
+      .os-tabs {
+        display: inline-flex;
+        padding: 4px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        margin-bottom: 32px;
+        gap: 2px;
+      }
+      .os-tab {
+        font-family: var(--sans);
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--muted);
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 18px;
+        cursor: pointer;
+      }
+      .os-tab:hover {
+        color: var(--ink);
+      }
+      .os-tab.active {
+        background: var(--panel-2);
+        color: var(--ink);
+      }
+
+      .os-panel {
+        display: none;
+      }
+      .os-panel.active {
+        display: block;
+        animation: reveal 0.25s ease forwards;
+      }
+
       .install-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -672,20 +723,24 @@
           <div>
             <h1>Adult sites stop resolving on this machine.</h1>
             <p class="subhead">
-              Blockr rewrites your Windows hosts file directly, so every
+              Blockr rewrites your system's hosts file directly, so every
               domain you block points at your own computer instead of its
               real server. Nothing to disable in a browser, nothing running
               in the background — just a file the OS reads before any
-              request leaves your machine.
+              request leaves your machine. Works on Windows, macOS, and
+              Linux.
             </p>
             <div class="cta-row">
-              <a
-                class="btn primary"
-                href="https://github.com/GreenEnergy1/Blockr/releases/latest/download/blockr.exe"
+              <a class="btn primary" id="primary-download" href="#install"
                 >Download for Windows</a
               >
               <a class="btn secondary" href="#how">See how it works</a>
             </div>
+            <p class="os-alt">
+              Also available for
+              <a href="#install" data-os="mac">macOS</a> and
+              <a href="#install" data-os="linux">Linux</a>.
+            </p>
             <div class="stats">
               <div class="stat"><b>1</b><span>file it edits</span></div>
               <div class="stat"><b>127.0.0.1</b><span>redirect target</span></div>
@@ -696,7 +751,7 @@
           <div class="term-window">
             <div class="term-bar">
               <span class="dot"></span>
-              <span class="path"
+              <span class="path" id="hosts-path"
                 >C:\Windows\System32\drivers\etc\hosts</span
               >
             </div>
@@ -855,26 +910,97 @@
         <div class="wrap">
           <div class="section-head">
             <h2>Get it running</h2>
-            <p>Two ways to install, depending on how much you trust a stranger's .exe.</p>
+            <p>Pick your OS, then either grab the build or run it from source.</p>
           </div>
-          <div class="install-grid">
-            <div class="install-col">
-              <h3>Download the build</h3>
-              <p class="req">
-                Windows only. The app requests administrator access on
-                launch, since it needs to edit a protected system file.
-              </p>
-              <pre class="code"><span class="c"># grab the latest release, then run it —</span>
-<span class="c"># Windows will prompt for elevation</span>
-blockr.exe</pre>
-            </div>
-            <div class="install-col">
-              <h3>Run from source</h3>
-              <p class="req">Requires Python 3.10+ and PyQt6.</p>
-              <pre class="code">py -m venv .venv
+
+          <div class="os-tabs" role="tablist">
+            <button class="os-tab active" data-os="windows" role="tab" aria-selected="true">Windows</button>
+            <button class="os-tab" data-os="mac" role="tab" aria-selected="false">macOS</button>
+            <button class="os-tab" data-os="linux" role="tab" aria-selected="false">Linux</button>
+          </div>
+
+          <div class="os-panel active" data-os-panel="windows">
+            <div class="install-grid">
+              <div class="install-col">
+                <h3>Download the build</h3>
+                <p class="req">
+                  The app requests administrator access on launch, since it
+                  needs to edit a protected system file.
+                </p>
+                <a
+                  class="btn primary"
+                  href="https://github.com/GreenEnergy1/Blockr/releases/latest/download/blockr.exe"
+                  >Download blockr.exe</a
+                >
+              </div>
+              <div class="install-col">
+                <h3>Run from source</h3>
+                <p class="req">Requires Python 3.10+ and PyQt6.</p>
+                <pre class="code">py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install PyQt6
 python blockr.py</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="os-panel" data-os-panel="mac">
+            <div class="install-grid">
+              <div class="install-col">
+                <h3>Download the build</h3>
+                <p class="req">
+                  Unsigned build — the first launch needs a right-click →
+                  Open to get past Gatekeeper. The app asks for your admin
+                  password on launch, since it needs to edit a protected
+                  system file.
+                </p>
+                <a
+                  class="btn primary"
+                  href="https://github.com/GreenEnergy1/Blockr/releases/latest/download/Blockr.dmg"
+                  >Download Blockr.dmg</a
+                >
+              </div>
+              <div class="install-col">
+                <h3>Run from source</h3>
+                <p class="req">Requires Python 3.10+ and PyQt6.</p>
+                <pre class="code">python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install PyQt6
+python3 blockr.py</pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="os-panel" data-os-panel="linux">
+            <div class="install-grid">
+              <div class="install-col">
+                <h3>Download the build</h3>
+                <p class="req">
+                  .deb for Debian/Ubuntu, .rpm for Fedora/RHEL. Both install
+                  a launcher entry and lean on PolicyKit for the elevation
+                  prompt — already on virtually every desktop distro.
+                </p>
+                <div class="cta-row" style="margin-bottom: 0">
+                  <a
+                    class="btn primary"
+                    href="https://github.com/GreenEnergy1/Blockr/releases/latest/download/blockr.deb"
+                    >Download .deb</a
+                  >
+                  <a
+                    class="btn secondary"
+                    href="https://github.com/GreenEnergy1/Blockr/releases/latest/download/blockr.rpm"
+                    >Download .rpm</a
+                  >
+                </div>
+              </div>
+              <div class="install-col">
+                <h3>Run from source</h3>
+                <p class="req">Requires Python 3.10+ and PyQt6.</p>
+                <pre class="code">python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install PyQt6
+python3 blockr.py</pre>
+              </div>
             </div>
           </div>
         </div>
@@ -888,16 +1014,73 @@ python blockr.py</pre>
             fail quietly instead of the page loading.
           </p>
           <div class="links-row">
-            <a
-              href="https://github.com/GreenEnergy1/Blockr/releases/latest/download/blockr.exe"
-              >Download</a
-            >
+            <a href="#install">Download</a>
             <a href="https://github.com/GreenEnergy1/Blockr/">Source</a>
           </div>
         </div>
       </section>
     </main>
 
-    <footer>© blockr — hosts file editor for Windows</footer>
+    <footer>© blockr — hosts file editor for Windows, macOS &amp; Linux</footer>
+
+    <script>
+      (function () {
+        var ua = navigator.userAgent || "";
+        var plat = navigator.platform || "";
+        var detected = "windows";
+        if (/Mac/i.test(plat) || /Macintosh/i.test(ua)) {
+          detected = "mac";
+        } else if (/Linux/i.test(plat) && !/Android/i.test(ua)) {
+          detected = "linux";
+        }
+
+        var downloadLabels = {
+          windows: "Download for Windows",
+          mac: "Download for macOS",
+          linux: "Download for Linux",
+        };
+        var hostsPaths = {
+          windows: "C:\\Windows\\System32\\drivers\\etc\\hosts",
+          mac: "/etc/hosts",
+          linux: "/etc/hosts",
+        };
+
+        function setOS(os) {
+          if (!downloadLabels[os]) return;
+
+          var btn = document.getElementById("primary-download");
+          if (btn) btn.textContent = downloadLabels[os];
+
+          var path = document.getElementById("hosts-path");
+          if (path) path.textContent = hostsPaths[os];
+
+          document.querySelectorAll(".os-tab").forEach(function (tab) {
+            var active = tab.getAttribute("data-os") === os;
+            tab.classList.toggle("active", active);
+            tab.setAttribute("aria-selected", active ? "true" : "false");
+          });
+          document.querySelectorAll(".os-panel").forEach(function (panel) {
+            panel.classList.toggle(
+              "active",
+              panel.getAttribute("data-os-panel") === os
+            );
+          });
+        }
+
+        document.querySelectorAll(".os-tab").forEach(function (tab) {
+          tab.addEventListener("click", function () {
+            setOS(tab.getAttribute("data-os"));
+          });
+        });
+
+        document.querySelectorAll(".os-alt a[data-os]").forEach(function (link) {
+          link.addEventListener("click", function () {
+            setOS(link.getAttribute("data-os"));
+          });
+        });
+
+        setOS(detected);
+      })();
+    </script>
   </body>
 </html>
