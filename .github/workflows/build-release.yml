@@ -1,0 +1,110 @@
+name: Build Release Artifacts
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller PyQt6
+      - name: Build Windows executable
+        run: |
+          pyinstaller packaging/windows/blockr-win.spec
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: blockr-windows
+          path: dist/blockr.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install pyinstaller PyQt6
+      - name: Build macOS app bundle
+        run: |
+          pyinstaller packaging/mac/blockr-mac.spec
+      - name: Create DMG
+        run: |
+          chmod +x packaging/mac/build-dmg.sh
+          VERSION=${GITHUB_REF#refs/tags/v}
+          ./packaging/mac/build-dmg.sh $VERSION
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: blockr-macos
+          path: dist/Blockr-*.dmg
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby ruby-dev build-essential
+          sudo gem install --no-document fpm
+          python3 -m pip install --upgrade pip
+          pip3 install pyinstaller PyQt6
+      - name: Build Linux binary
+        run: |
+          pyinstaller packaging/linux/blockr-linux.spec
+      - name: Create DEB package
+        run: |
+          chmod +x packaging/linux/build-deb.sh
+          VERSION=${GITHUB_REF#refs/tags/v}
+          ./packaging/linux/build-deb.sh $VERSION
+      - name: Create RPM package
+        run: |
+          chmod +x packaging/linux/build-rpm.sh
+          VERSION=${GITHUB_REF#refs/tags/v}
+          ./packaging/linux/build-rpm.sh $VERSION
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: blockr-linux
+          path: |
+            dist/blockr_*.deb
+            dist/blockr-*.rpm
+
+  create-release:
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: release-artifacts
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-artifacts/**/*
+          prerelease: true
+          draft: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
