@@ -110,9 +110,15 @@ HOSTS_PATH = (
 REDIRECT_IP = "127.0.0.1"
 MARKER = "#BLOCKR"
 
+COMMON_TLDS = [".com", ".to", ".net", ".org", ".xyz", ".sx", ".cc", ".ru" , ".pk" ,".ng"]
+
 # Seed list used by "Restore Default Blocklist". Deduplicated on load, so
-# it's safe to add to this without worrying about repeats.
+# it's safe to add to this without worrying about repeats. Mixes full
+# domains with bare keyword seeds (no dot) — keyword seeds are expanded
+# across COMMON_TLDS by add_site()/expand_keyword() at write time.
 DEFAULT_BLOCKS = sorted(set([
+
+    # --- Adult content ---
     "pornhub.com", "xvideos.com", "xnxx.com", "redtube.com", "youporn.com",
     "brazzers.com", "spankbang.com", "txxx.com", "hclips.com", "beeg.com",
     "xhamster.com", "slutload.com", "porndig.com", "motherless.com",
@@ -120,7 +126,53 @@ DEFAULT_BLOCKS = sorted(set([
     "yespornplease.com", "xtube.com", "3movs.com", "sextvx.com", "porn.com",
     "drtuber.com", "empflix.com", "hdzog.com", "keeplinks.org",
     "lubetube.com", "mylust.com", "shooshtime.com",
+
+    # --- Social media ---
+    "facebook.com", "instagram.com", "tiktok.com", "twitter.com", "x.com",
+    "snapchat.com", "reddit.com", "pinterest.com", "tumblr.com",
+    "threads.net", "discord.com", "linkedin.com",
+
+    # --- Video / streaming platforms ---
+    "netflix.com", "hulu.com", "twitch.tv", "primevideo.com",
+    "disneyplus.com", "hbomax.com", "peacocktv.com",
+
+    # --- Gambling / betting ---
+    "bet365.com", "draftkings.com", "fanduel.com", "pokerstars.com",
+    "bovada.lv", "stake.com", "betway.com", "williamhill.com",
+    "888casino.com", "partypoker.com", "unibet.com", "ladbrokes.com",
+
+    # --- Torrent & download sites ---
+    "thepiratebay.org", "1337x.to", "rarbg.to", "yts.mx", "torrentz2.eu",
+    "kickasstorrents.to", "limetorrents.info", "torlock.com", "zooqle.com",
+    "nyaa.si", "eztv.re", "isohunt.to",
+
+    # --- File hosting (cyberlockers) ---
+    "mega.nz", "mediafire.com", "4shared.com", "zippyshare.com",
+    "rapidgator.net", "uploaded.net", "turbobit.net", "nitroflare.com",
+    "katfile.com", "ddownload.com", "uptobox.com", "1fichier.com",
+
+    # --- Proxy / VPN services (used to route around blocks) ---
+    "hidemyass.com", "proxysite.com", "croxyproxy.com", "kproxy.com",
+    "hide.me", "4everproxy.com", "proxyscrape.com", "whoer.net",
+    "zenmate.com",
+
+    # --- Piracy keyword seeds (base names, NOT full domains —
+    # expanded across COMMON_TLDS at add-time since these sites
+    # rotate domains constantly) ---
+    "fmovies", "soap2day", "sflix", "myflixer", "bflix", "watchfree",
+    "freemovies", "vidcloud", "megacloud", "streamsb", "gomovies",
+    "putlocker", "solarmovie", "yesmovies", "123movies", "moviesjoy","goojaro",
+    "hurawatch", "flixtor", "vumoo", "projectfreetv","moviebox", "movieboxhd","themoviebox"
 ]))
+
+
+def expand_keyword(keyword: str) -> list[str]:
+    """Expand a bare keyword seed (no dot) into full domains across the
+    TLDs these piracy/streaming mirrors tend to rotate through."""
+    keyword = keyword.strip().lower()
+    if not keyword:
+        return []
+    return [f"{keyword}{tld}" for tld in COMMON_TLDS]
 
 
 def resource_path(filename: str) -> str:
@@ -147,7 +199,9 @@ def clean_site(raw: str) -> str | None:
 
 
 def get_blocked_sites() -> list[str]:
-    """Return the sorted set of bare domains currently managed by Blockr."""
+    """Return the sorted set of bare domains currently managed by Blockr.
+    Collapses the www. and m. variants back down to their bare domain so
+    each blocked site shows up as a single entry, not three."""
     sites = set()
     try:
         with open(HOSTS_PATH, "r", encoding="utf-8", errors="ignore") as f:
@@ -156,7 +210,7 @@ def get_blocked_sites() -> list[str]:
                     continue
                 parts = line.split()
                 if len(parts) >= 2:
-                    host = parts[1].removeprefix("www.")
+                    host = parts[1].removeprefix("www.").removeprefix("m.")
                     sites.add(host)
     except FileNotFoundError:
         pass
@@ -164,28 +218,47 @@ def get_blocked_sites() -> list[str]:
     return sorted(sites)
 
 
-def add_site(site: str, already_blocked: set[str]) -> bool:
-    """Append hosts entries for a domain. Returns False if it's already
-    blocked (so callers can report skipped domains) rather than writing a
-    duplicate line."""
-    site = clean_site(site)
-    if not site or site in already_blocked:
-        return False
+def add_site(site: str, already_blocked: set[str]) -> int:
+    """Append hosts entries for a site. If `site` contains a dot it's
+    treated as a literal domain; otherwise it's treated as a keyword seed
+    and expanded into multiple domains via expand_keyword().
 
-    with open(HOSTS_PATH, "a", encoding="utf-8") as f:
-        f.write(f"{REDIRECT_IP} {site} {MARKER}\n")
-        f.write(f"{REDIRECT_IP} www.{site} {MARKER}\n")
+    For every resulting domain not already blocked, writes domain,
+    www.domain, and m.domain lines, and adds the bare domain to
+    `already_blocked` so repeat calls (and get_blocked_sites) stay in
+    sync. Returns the number of new domains actually added — 0 means
+    everything was already blocked (or the input was empty), so existing
+    `if add_site(...)` truthiness checks keep working unchanged."""
+    cleaned = clean_site(site)
+    if not cleaned:
+        return 0
 
-    already_blocked.add(site)
-    return True
+    domains = [cleaned] if "." in cleaned else expand_keyword(cleaned)
+
+    lines = []
+    added = 0
+    for domain in domains:
+        if not domain or domain in already_blocked:
+            continue
+        lines.append(f"{REDIRECT_IP} {domain} {MARKER}\n")
+        lines.append(f"{REDIRECT_IP} www.{domain} {MARKER}\n")
+        lines.append(f"{REDIRECT_IP} m.{domain} {MARKER}\n")
+        already_blocked.add(domain)
+        added += 1
+
+    if lines:
+        with open(HOSTS_PATH, "a", encoding="utf-8") as f:
+            f.writelines(lines)
+
+    return added
 
 
 def remove_site(site: str) -> None:
     """Remove every Blockr-tagged line for an exact domain (and its www.
-    variant) — never a substring match, so 'sex.com' can't accidentally
-    also remove 'unisex.com'."""
+    variant, and m. variant) — never a substring match, so 'sex.com'
+    can't accidentally also remove 'unisex.com'."""
     site = site.strip().lower()
-    targets = {site, f"www.{site}"}
+    targets = {site, f"www.{site}", f"m.{site}"}
 
     with open(HOSTS_PATH, "r", encoding="utf-8", errors="ignore") as f:
         lines = f.readlines()
@@ -201,8 +274,11 @@ def remove_site(site: str) -> None:
 
 
 def batch_add(raw: str) -> tuple[int, int]:
-    """Add every domain in a comma/newline separated blob.
-    Returns (added_count, skipped_count)."""
+    """Add every domain/keyword in a comma/newline separated blob.
+    A keyword seed (no dot) expands into several domains, all counted
+    toward `added`. Returns (added_count, skipped_count), where skipped
+    counts input tokens that produced no new domain (already blocked, or
+    an all-duplicate keyword expansion)."""
     if not raw:
         return 0, 0
 
@@ -211,11 +287,12 @@ def batch_add(raw: str) -> tuple[int, int]:
 
     added = skipped = 0
     for part in parts:
-        site = clean_site(part)
-        if not site:
+        token = part.strip()
+        if not token:
             continue
-        if add_site(site, already_blocked):
-            added += 1
+        count = add_site(token, already_blocked)
+        if count:
+            added += count
         else:
             skipped += 1
 
